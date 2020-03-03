@@ -18,35 +18,67 @@ library(tidyverse)
 library(nycflights13)
 # flights
 # weather
+library(dplyr)
+library(ggplot2)
 ```
 
 
 Make a plot with three facets, one for each airport in the weather data.  The x-axis should be the day of the year (1:365) and the y-axis should be the mean temperature recorded on that day, at that airport.
 ```{r}
 library(lubridate)
-weather %>% mutate(day_of_year = yday(time_hour))
+weather %>% 
+  mutate(day_of_year = yday(time_hour)) %>% 
+  group_by(origin,day_of_year) %>%
+  summarize(mean_temp = mean(temp)) %>% 
+  ggplot() +
+  geom_point(mapping = aes(x = day_of_year, y = mean_temp)) +
+  facet_grid(.~origin)
 ```
 
 
 Make a non-tidy matrix of that data where each row is an airport and each column is a day of the year.  
 
 ```{r}
+weather %>% 
+  mutate(day_of_year = yday(time_hour)) %>% 
+  group_by(origin, day_of_year) %>% 
+  summarize(ave.temp = mean(temp, na.rm = T)) %>% 
+  pivot_wider(names_from = day_of_year, values_from = ave.temp)
 
 ```
 
 
 For each (airport, day) contruct a tidy data set of the airport's "performance" as the proportion of flights that departed less than an hour late. 
 ```{r}
+performance.dat <- flights %>% 
+  mutate(day_of_year = yday(time_hour)) %>% 
+  group_by(origin, day_of_year) %>%
+  summarize(performance = mean(dep_delay < 60, na.rm = T))
+  
 ```
 
 Construct a tidy data set to that give weather summaries for each (airport, day).  Use the total precipitation, minimum visibility, maximum wind_gust, and average wind_speed.  
 ```{r}
+weather.dat <- weather %>% 
+  mutate(day_of_year = yday(time_hour)) %>% 
+  group_by(origin, day_of_year) %>% 
+  summarize(total.precitipitation = sum(precip,na.rm = T),
+            minimum.visibility = min(visib),
+            average.wind_speed = mean(wind_speed,na.rm = T))
+
 ```
 
 Construct a linear model to predict the performance of each (airport,day) using the weather summaries and a "fixed effect" for each airport.  Display the summaries.  
 ```{r}
+dat <- left_join(weather.dat, performance.dat)
+m <- lm(performance ~ total.precitipitation + minimum.visibility + average.wind_speed, data = dat)
+summary(m)
+
 ```
 
 Repeat the above, but only for EWR.  Obviously, exclude the fixed effect for each airport.
 ```{r}
+dat.EWR <- dat %>% filter(origin == "EWR")
+m.EWR <- lm(performance ~ total.precitipitation + minimum.visibility + average.wind_speed, data = dat.EWR)
+summary(m.EWR)
 ```
